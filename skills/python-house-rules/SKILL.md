@@ -48,14 +48,70 @@ Before editing:
 If repo-local rules conflict with these house rules, follow the stricter or more
 specific rule and mention the conflict briefly.
 
+## The Short List
+
+Thirteen rules that decide most reviews. Apply them while writing, not after.
+
+1. **Bare `return`, never `return None`.** `None` is a return *value* only when the
+   caller distinguishes it from absence.
+2. **Test truthiness, not `is None`.** `if items:` — spell out `is None` only where
+   `0`, `""`, `[]`, or `{}` are meaningful values distinct from absence.
+3. **Don't guard values your own code produced.** Validate at the trust boundary —
+   external input, user data, a third-party response — and past it, read the value.
+   Prefer one declarative filter at the boundary over an `if` at the top of every
+   consumer.
+4. **No data model without a boundary to justify it.** Define a schema where the
+   shape is untrusted or contractual: external input, a response you publish, an
+   LLM's structured output. Everywhere else pass dicts, arguments, and rows.
+5. **Comments describe the end state.** No note about what the code used to do, no
+   "previously", no pointer at adjacent code. What survives is a *why* the code
+   cannot show.
+6. **Spell names out** (`workflow`, not `wf`). No helper with one caller — inline it.
+7. **Application code calls the framework's public surface, never its internals.**
+   Reaching for a framework's persistence, event, or lifecycle primitive from
+   application code means bypassing the seam that exists for it.
+8. **Derive state from its owner; never stamp a second copy.** Whoever owns the
+   fact — the upstream service, the lifecycle, the webhook — is its only writer.
+9. **Pass identity, not a pre-assembled payload.** A capable consumer fetches its
+   own data and writes its own output. Threading denormalized metadata through the
+   call chain to save it the trip couples both sides to a shape neither owns.
+10. **One noun per concept.** Inputs carry identity; state carries what was learned.
+    Never compose a bag that is both.
+11. **Failure raises a typed error; it never returns a sentinel.** No `Value | str`
+    error union, no `X | None` standing in for ok/fail, no `isinstance` on the error
+    arm at the call site.
+12. **Keep the wire boundary thin.** A single-field request body is one embedded
+    field, not a one-field model. A response object is a projection over data handed
+    to it — the caller does the fetching; a schema method never queries.
+13. **Write the positive condition.** `if value: do` — not `if not value: return`
+    followed by the happy path a single positive branch could hold. Flip it and let
+    the miss fall through. Negative guards stay for raises and genuine multi-exit
+    chains.
+
 ## Core Philosophy
 
 - Code should read like prose written by someone who already understands the domain.
+  If a reader needs your explanation to follow it, the code is wrong: fix the code
+  and delete the explanation.
 - Minimize the time the next reader spends building a mental model.
+- Names carry the meaning. A function's name plus its signature should make its body
+  predictable before you read it. Name things for what they ARE in the domain's
+  words, never for their mechanism, their pattern, or their position in a pipeline.
+  If you cannot name it cleanly, you do not understand the concept yet — stop and
+  re-derive it.
+- One idea per function, at one altitude. Policy sitting next to plumbing is the tell.
+  Behavior lives on the type that owns the data, not in a helper module.
+- Shape functions top-down: the happy path is the spine, exits are early, nesting is
+  shallow, and the ending is the interesting case.
+- Prefer no new surface. A parameter or an inline beats a new function; a new function
+  beats a new class; a new class beats a new package. Cheap to write is not a reason
+  to exist.
 - Prefer clean current design over compatibility layers unless compatibility is explicitly required.
 - Abstractions earn their place by being used three times or more; before that, duplication is often cheaper than indirection.
 - Build only what the task asks for. Do not add config knobs, options, alternate code paths, or speculative resilience that were not requested — unused flexibility is complexity no one is paying for. When a "while I'm here" extension is tempting, leave it out (or raise it separately).
-- Guard clauses live at the top of functions; main logic lives in the middle.
+- Guard clauses live at the top of functions; main logic lives in the middle. A guard
+  earns its place by raising or by opening a genuine second path — not by wrapping the
+  one branch rule 13 would have you write positively.
 - Keep functions focused and side effects explicit.
 - Reuse existing project patterns before introducing new abstractions or dependencies.
 - Be skeptical of generic abstraction layers that only move data around; keep abstractions only where there is real behavioral variation.
@@ -65,6 +121,16 @@ specific rule and mention the conflict briefly.
 - Prefer domain-owned path builders and identifiers over settings-driven path glue.
 - Avoid projection or mirror data models unless there is a hard product requirement for separate copies.
 - Keep I/O, subprocess, network, and database boundaries easy to spot.
+
+## Public Surfaces
+
+When the code is something other people will call — a library, an SDK, a plugin API,
+a published client — the surface is the product, not the plumbing. Design it by
+writing the example first: the obvious call is the correct one, the correct one is
+short, and a newcomer gets it right without reading the source or the docs. No
+exposed internals, no required boilerplate, no ceremony, no knowledge of framework
+mechanics leaking into caller code. If the example needs a paragraph of setup or a
+caveat, the surface is wrong — redesign it.
 
 ## Debugging Rules
 
@@ -80,6 +146,25 @@ specific rule and mention the conflict briefly.
 - Typical Python verification is `uv run pytest`, `uv run ruff check`, and formatter check such as `uv run ruff format --check` or the repo's configured equivalent.
 - Do not run formatters or linters in rewrite mode unless implementation work calls for it and the user has not restricted edits.
 - For Django behavior changes, include migrations checks and focused tests when relevant.
+- Never pipe a test run that decides whether you commit. Run it as its own command so
+  you read the real exit status, not the tail of a pipeline.
+- After any scripted or bulk edit, grep to confirm it landed.
+
+## Before You Commit
+
+Re-read The Short List against **every file the change touches, end to end — not the
+diff**. A smell on an untouched line in a file you edited is yours the moment you
+edit that file. Make the pass mechanical: grep the touched files for the tells.
+
+- `from … import` inside a `def` — a function-level import with no real cycle to break
+- `isinstance(` applied to data your own code produced
+- `-> … | str` or `| None` used as an ok/fail union
+- `class X(BaseModel)` with a single field
+- `def _helper` with one call site
+- a query (`.get(`, `.all(`, `session`) inside a schema or DTO method
+
+Then read the files once more as prose. If a line makes you wince, that is the
+finding — fix it, or say it out loud in your final response.
 
 ## Decision Defaults
 
