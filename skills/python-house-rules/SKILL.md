@@ -146,11 +146,14 @@ caveat, the surface is wrong — redesign it.
 - Typical Python verification is `uv run pytest`, `uv run ruff check`, and formatter check such as `uv run ruff format --check` or the repo's configured equivalent.
 - Do not run formatters or linters in rewrite mode unless implementation work calls for it and the user has not restricted edits.
 - For Django behavior changes, include migrations checks and focused tests when relevant.
-- Never pipe a test run that decides whether you commit. Run it as its own command so
-  you read the real exit status, not the tail of a pipeline.
+- Never pipe a test run whose result decides whether the work is done. Run it as its
+  own command so you read the real exit status, not the tail of a pipeline.
 - After any scripted or bulk edit, grep to confirm it landed.
 
-## Before You Commit
+## Before You Call It Done
+
+Whatever "done" means for this task — a commit, a pushed branch, a diff handed back,
+a review posted, an answer in chat — do this pass first.
 
 Re-read The Short List against **every file the change touches, end to end — not the
 diff**. A smell on an untouched line in a file you edited is yours the moment you
